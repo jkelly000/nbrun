@@ -1,5 +1,5 @@
 import pytest
-from nb_runner.var_replacer import replace_vars
+from nbrun.var_replacer import replace_vars
 from typing import Any
 
 def new_foo():

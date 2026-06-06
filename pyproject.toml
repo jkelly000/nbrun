@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 name = "nbrun"
 description = "A framework to execute Python code from ipynb files, optionally modifying the source code before execution."
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
     { name = "John Kelly", email = "mrjrkelly@gmail.com" },
 ]
@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
@@ -30,16 +30,18 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
+python = "^3.11.0"
+
 black = "^24.4.2"
 ipython = "^9.12.0"
 mypy = "^1.11.0"
 nbconvert = "^7.17.1"
 nbformat = "^5.10.4"
-python = "^3.12.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^9.0.1"
 
 
 
 [project.urls]
-Repository = "https://github.com/jkelly000/pytest-notebook"
-[project.entry-points.pytest11]
-notebook = "pytest_notebook.plugin"
+Repository = "https://github.com/jkelly000/nbrun"

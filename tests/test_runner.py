@@ -1,4 +1,4 @@
-from nb_runner import runner
+from nbrun import runner
 import pytest
 
 from pathlib import Path
