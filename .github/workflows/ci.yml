@@ -26,9 +26,6 @@ jobs:
     - name: Install dependencies
       run: poetry install
     - name: Lint
-      run: |
-        poetry run ruff check .
-        poetry run ruff format . --check
-        poetry run mypy .
-    - name: Test with pytest
-      run: poetry run pytest . --disable-socket
+      run: bash ./scripts/lint.sh
+    - name: Run unit tests
+      run: bash ./scripts/test.sh
