@@ -1,4 +1,5 @@
 **/__pycache__/**
 dist
 build
+poetry.lock
 pytest_notebook.egg-info
