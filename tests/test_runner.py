@@ -1,5 +1,4 @@
 from nbrun import runner
-import pytest
 
 from pathlib import Path
 
@@ -44,7 +43,7 @@ def test_run_notebook_context_manager() -> None:
     with runner.load_notebook(
         notebook_path=str(TEST_DATA_PATH / "notebook.ipynb")
     ) as nb_runner:
-        result = nb_runner.execute()
+        nb_runner.execute()
 
     assert not nb_runner.py_path.exists()
     assert not nb_runner.modified_py_path.exists()
