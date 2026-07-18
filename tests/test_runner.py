@@ -26,6 +26,9 @@ def test_load_module() -> None:
 def test_execute_module() -> None:
     nb_runner = runner.NotebookRunner(notebook_path=TEST_DATA_PATH / "notebook.ipynb")
 
+    # Defensive sanity check: NotebookRunner should have set `module`. If this
+    # ever raises, it's indicative of a constructor/load_module failure and
+    # signals a bug rather than a normal test failure.
     if nb_runner.module is None:
         raise RuntimeError("module is None")
     pre_exec_vars_count = len(nb_runner.module.__dict__)

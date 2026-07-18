@@ -52,8 +52,11 @@ class NotebookRunner:
         return out_path
 
     def load_module(self) -> None:
+        # Defensive runtime check: modified_py_path should always be set by modify_vars.
+        # If this check ever triggers it's a bug in the construction flow, so raise a
+        # clear error. This is not expected during normal operation.
         if self.modified_py_path is None:
-            raise ValueError
+            raise ValueError("modified_py_path is unexpectedly None")
         # Take a hash of the filepath as the module name
         module_name = sha256(str(self.modified_py_path).encode("utf-8")).hexdigest()[
             10:
@@ -61,13 +64,17 @@ class NotebookRunner:
         spec = importlib.util.spec_from_file_location(
             module_name, str(self.modified_py_path)
         )
-        # spec and its loader can be None; validate before use
+        # Defensive runtime validation: importlib may return None for spec or loader in
+        # unusual environments. In normal use with a valid Python file this should
+        # never happen. The explicit check both makes the failure mode clear at
+        # runtime and satisfies the type checker.
         if spec is None or spec.loader is None:
             raise ValueError("Could not create module spec or loader")
         module = importlib.util.module_from_spec(spec)
         setattr(module, "display", mock.MagicMock())
         self.module = module
         loader = spec.loader
+        # loader.exec_module is a callable used to execute the module; keep its type clear
         self.execute_module = loader.exec_module
         return None
 
