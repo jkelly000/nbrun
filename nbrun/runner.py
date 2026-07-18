@@ -78,7 +78,7 @@ class NotebookRunner:
         self.execute_module = loader.exec_module
         return None
 
-    def execute(self) -> Any:
+    def execute(self) -> ModuleType:
         if self.module is None or self.execute_module is None:
             raise ValueError("Call load_module first")
         self.execute_module(self.module)
