@@ -1,5 +1,5 @@
 import ast
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 import inspect
 
 T = TypeVar("T", bound=ast.AST)
@@ -10,7 +10,7 @@ class VarReplacer(ast.NodeTransformer):
 
     def __init__(self, vars_to_replace: dict[str, Any]):
         self.vars_to_replace = vars_to_replace
-        self.scope_stack = []  # Track current function/class scope
+        self.scope_stack: list[str] = []  # Track current function/class scope
 
     def _get_full_path(self, name: str) -> str:
         """Build hierarchical path: 'func:var' or 'class:func:var'"""
@@ -41,7 +41,7 @@ class VarReplacer(ast.NodeTransformer):
 
     def _visit_scope(self, node: T, scope_name: str) -> T:
         self.scope_stack.append(scope_name)
-        node = self.generic_visit(node)
+        node = cast(T, self.generic_visit(node))
         self.scope_stack.pop()
         return node
 
@@ -49,9 +49,9 @@ class VarReplacer(ast.NodeTransformer):
         if node.name in self.vars_to_replace:
             replacement = self.vars_to_replace[node.name]
             if callable(replacement):
-                func_def: ast.FunctionDef = ast.parse(
-                    inspect.getsource(replacement)
-                ).body[0]
+                func_def = cast(
+                    ast.FunctionDef, ast.parse(inspect.getsource(replacement)).body[0]
+                )
                 # Rename the function so it can work as a drop-in replacement
                 func_def.name = node.name
                 return func_def

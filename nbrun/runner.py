@@ -4,6 +4,7 @@ from pathlib import Path
 from hashlib import sha256
 from unittest import mock
 from typing import Any, Callable
+from types import ModuleType
 import functools
 
 from .var_replacer import replace_vars
@@ -22,8 +23,8 @@ class NotebookRunner:
         self.temp_dir = TemporaryDirectory()
         self.py_path = self.ipynb_to_py()
         self.modified_py_path = self.modify_vars()
-        self.module = None
-        self.execute_module = None
+        self.module: ModuleType | None = None
+        self.execute_module: Callable[[ModuleType], None] | None = None
         self.load_module()
 
     def ipynb_to_py(self) -> Path:
@@ -60,10 +61,14 @@ class NotebookRunner:
         spec = importlib.util.spec_from_file_location(
             module_name, str(self.modified_py_path)
         )
+        # spec and its loader can be None; validate before use
+        if spec is None or spec.loader is None:
+            raise ValueError("Could not create module spec or loader")
         module = importlib.util.module_from_spec(spec)
-        module.display = mock.MagicMock()
+        setattr(module, "display", mock.MagicMock())
         self.module = module
-        self.execute_module = spec.loader.exec_module
+        loader = spec.loader
+        self.execute_module = loader.exec_module
         return None
 
     def execute(self) -> Any:

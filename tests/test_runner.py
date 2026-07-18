@@ -26,6 +26,8 @@ def test_load_module() -> None:
 def test_execute_module() -> None:
     nb_runner = runner.NotebookRunner(notebook_path=TEST_DATA_PATH / "notebook.ipynb")
 
+    if nb_runner.module is None:
+        raise RuntimeError("module is None")
     pre_exec_vars_count = len(nb_runner.module.__dict__)
     nb_runner.execute()
 
