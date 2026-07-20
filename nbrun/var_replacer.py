@@ -1,6 +1,5 @@
 import ast
 from typing import Any, TypeVar, cast
-import inspect
 
 T = TypeVar("T", bound=ast.AST)
 
@@ -11,10 +10,34 @@ class VarReplacer(ast.NodeTransformer):
     def __init__(self, vars_to_replace: dict[str, Any]):
         self.vars_to_replace = vars_to_replace
         self.scope_stack: list[str] = []  # Track current function/class scope
+        # Validate all replacements upfront
+        self._validate_replacements()
 
     def _get_full_path(self, name: str) -> str:
         """Build hierarchical path: 'func:var' or 'class:func:var'"""
         return ":".join(self.scope_stack + [name])
+
+    def _is_constant(self, value: Any) -> bool:
+        """Check if a value can be represented as an ast.Constant."""
+        if value is None or isinstance(value, (bool, int, float, str, bytes)):
+            return True
+        if isinstance(value, (tuple, frozenset)):
+            return all(self._is_constant(v) for v in value)
+        return False
+
+    def _validate_replacements(self) -> None:
+        """Validate that all replacements are usable."""
+        for key, value in self.vars_to_replace.items():
+            if callable(value):
+                raise ValueError(
+                    f"Replacement for '{key}' is a callable. "
+                    f"Only constant values are supported (int, str, bool, None, tuple, frozenset)."
+                )
+            if not self._is_constant(value):
+                raise ValueError(
+                    f"Replacement for '{key}' is not a constant. Got {type(value).__name__}. "
+                    f"Only constant values are supported (int, str, bool, None, tuple, frozenset)."
+                )
 
     def visit_Assign(self, node: ast.Assign) -> ast.Assign:
         # Check if any target matches our replacement dict
@@ -46,20 +69,10 @@ class VarReplacer(ast.NodeTransformer):
         return node
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
-        if node.name in self.vars_to_replace:
-            replacement = self.vars_to_replace[node.name]
-            if callable(replacement):
-                func_def = cast(
-                    ast.FunctionDef, ast.parse(inspect.getsource(replacement)).body[0]
-                )
-                # Rename the function so it can work as a drop-in replacement
-                func_def.name = node.name
-                return func_def
-            raise ValueError
-
-        else:
-            node = self._visit_scope(node, node.name)
-            return node
+        # Visit the function body for variable replacements (e.g., "func:var": 123)
+        # but don't replace the function definition itself
+        node = self._visit_scope(node, node.name)
+        return node
 
     def visit_For(self, node: ast.For) -> ast.For:
         return self._visit_scope(node, "for")

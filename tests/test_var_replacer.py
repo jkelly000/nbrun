@@ -3,10 +3,6 @@ from nbrun.var_replacer import replace_vars
 from typing import Any
 
 
-def new_foo():
-    return 999
-
-
 @pytest.mark.parametrize(
     ("source", "vars_to_replace", "output"),
     [
@@ -28,12 +24,6 @@ def new_foo():
         ),
         pytest.param(
             "x = 1\ny = 2", {"x": 10, "y": 20}, "x = 10\ny = 20", id="multiple_vars"
-        ),
-        pytest.param(
-            "def foo():\n    return 1",
-            {"foo": new_foo},
-            "def foo():\n    return 999",
-            id="replace_entire_func",
         ),
         pytest.param(
             "for i in range(10):\n    x = 5",
@@ -69,3 +59,18 @@ def new_foo():
 )
 def test_replace_vars(source: str, vars_to_replace: dict[str, Any], output: str):
     assert replace_vars(source, vars_to_replace) == output
+
+
+def test_reject_non_constants():
+    """Non-constant objects must be rejected."""
+    with pytest.raises(ValueError, match="not a constant"):
+        replace_vars("x = 5", {"x": object()})
+
+
+def test_reject_callables():
+    """Callables are not supported."""
+    with pytest.raises(ValueError, match="is a callable"):
+        replace_vars("x = 5", {"x": lambda: 1})
+
+    with pytest.raises(ValueError, match="is a callable"):
+        replace_vars("x = 5", {"x": len})
