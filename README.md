@@ -31,7 +31,7 @@ module = nr.execute()
 assert module.result == 42
 ```
 
-## 3) Replace variable values for deterministic tests
+## 3) Replace variable values in tests
 
 ```python
 from nbrun import runner
