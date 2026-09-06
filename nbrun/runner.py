@@ -1,57 +1,61 @@
 import importlib.util
+import warnings
 from nbconvert import PythonExporter
 from pathlib import Path
 from hashlib import sha256
 from unittest import mock
 from typing import Any, Callable
 from types import ModuleType
-import functools
 
 from .var_replacer import replace_vars
 
 from tempfile import TemporaryDirectory
 
 
-class NotebookRunner:
+class Notebook:
     def __init__(
-        self, notebook_path: str | Path, vars_to_replace: dict[str, Any] | None = None
+        self, path: str | Path, vars_to_replace: dict[str, Any] | None = None
     ) -> None:
-        self.notebook_path = (
-            notebook_path if isinstance(notebook_path, Path) else Path(notebook_path)
-        )
-        self.vars_to_replace = vars_to_replace or {}
-        self.temp_dir = TemporaryDirectory()
-        self.py_path = self.ipynb_to_py()
-        self.modified_py_path = self.modify_vars()
-        self.module: ModuleType | None = None
-        self.execute_module: Callable[[ModuleType], None] | None = None
-        self.load_module()
+        self._path = path if isinstance(path, Path) else Path(path)
+        self._vars_to_replace = vars_to_replace or {}
+        self._temp_dir = TemporaryDirectory()
+        self.py_path = self._ipynb_to_py()
+        self.modified_py_path = self._modify_vars()
+        self._module: ModuleType | None = None
+        self._execute_module: Callable[[ModuleType], None] | None = None
+        self._load_module()
 
-    def ipynb_to_py(self) -> Path:
+    def _ipynb_to_py(self) -> Path:
         """
         Given a path of a Jupyter Notebook, export it as a Python file
         to the specified path, without any modification.
         """
         python_exporter = PythonExporter()
 
-        out_path = Path(self.temp_dir.name) / self.notebook_path.with_suffix(".py").name
+        out_path = Path(self._temp_dir.name) / self._path.with_suffix(".py").name
 
-        py_source, _ = python_exporter.from_filename(str(self.notebook_path))
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="IPython is needed to transform IPython syntax to pure Python. Install ipython if you need this functionality.",
+                category=UserWarning,
+            )
+            py_source, _ = python_exporter.from_filename(str(self._path))
         with open(str(out_path), "w") as fh:
             fh.write(py_source)
         return out_path
 
-    def modify_vars(self) -> Path:
+    def _modify_vars(self) -> Path:
         with open(str(self.py_path), "r") as fh:
-            modified_source = replace_vars(fh.read(), self.vars_to_replace)
-        out_path = Path(self.temp_dir.name) / self.py_path.with_stem(
+            modified_source = replace_vars(fh.read(), self._vars_to_replace)
+        out_path = Path(self._temp_dir.name) / self.py_path.with_stem(
             f"{self.py_path.stem}_modified"
         )
         with open(str(out_path), "w") as fh:
             fh.write(modified_source)
         return out_path
 
-    def load_module(self) -> None:
+    def _load_module(self) -> None:
         # Defensive runtime check: modified_py_path should always be set by modify_vars.
         # If this check ever triggers it's a bug in the construction flow, so raise a
         # clear error. This is not expected during normal operation.
@@ -72,41 +76,25 @@ class NotebookRunner:
             raise ValueError("Could not create module spec or loader")
         module = importlib.util.module_from_spec(spec)
         setattr(module, "display", mock.MagicMock())
-        self.module = module
+        self._module = module
         loader = spec.loader
         # loader.exec_module is a callable used to execute the module; keep its type clear
-        self.execute_module = loader.exec_module
+        self._execute_module = loader.exec_module
         return None
 
     def execute(self) -> ModuleType:
-        if self.module is None or self.execute_module is None:
+        if self._module is None or self._execute_module is None:
             raise ValueError("Call load_module first")
-        self.execute_module(self.module)
-        return self.module
+        self._execute_module(self._module)
+        return self._module
 
-
-class load_notebook:
-    def __init__(
-        self, notebook_path: str, vars_to_replace: dict[str, Any] | None = None
-    ):
-        self.notebook_path = notebook_path
-        self.vars_to_replace = vars_to_replace
-        self.runner = None
-        return
+    def cleanup(self) -> None:
+        self._temp_dir.cleanup()
 
     def __enter__(self):
-        self.runner = NotebookRunner(self.notebook_path, self.vars_to_replace)
-        return self.runner
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Cleanup on exit."""
-        self.runner.temp_dir.cleanup()
+        self.cleanup()
         return False
-
-    def __call__(self, func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            with self:
-                return func(self.runner, *args, **kwargs)
-
-        return wrapper

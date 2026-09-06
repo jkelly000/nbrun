@@ -5,7 +5,8 @@ build-backend = "poetry.core.masonry.api"
 [project]
 name = "nbrun"
 description = "A framework to execute Python code from ipynb files, optionally modifying the source code before execution."
-version = "0.1.0"
+version = "0.1.1"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "John Kelly", email = "mrjrkelly@gmail.com" },

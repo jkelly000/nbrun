@@ -14,10 +14,10 @@ Use cases and examples
 ## 1) Quick programmatic run
 
 ```python
-from nbrun import 
+from nbrun import runner
 
-nr = runner.NotebookRunner("notebook.ipynb")
-module = nr.execute()
+with runner.Notebook("notebook.ipynb") as nr:
+    module = nr.execute()
 ```
 
 
@@ -26,9 +26,9 @@ module = nr.execute()
 ```python
 from nbrun import runner
 
-nr = runner.NotebookRunner("notebook.ipynb")
-module = nr.execute()
-assert module.result == 42
+with runner.Notebook("notebook.ipynb") as nr:
+    module = nr.execute()
+    assert module.result == 42
 ```
 
 ## 3) Replace variable values in tests
@@ -37,8 +37,8 @@ assert module.result == 42
 from nbrun import runner
 
 replacements = {"global_seed": 123, "cached_result": expensive_value}
-nr = runner.NotebookRunner("notebook.ipynb", vars_to_replace=replacements)
-module = nr.execute()
+with runner.Notebook("notebook.ipynb", vars_to_replace=replacements) as nr:
+    module = nr.execute()
 ```
 
 This replaces the **value** assigned to variables, which includes function call results. For example, if a notebook contains:
@@ -61,7 +61,7 @@ For external API calls and side effects, use `unittest.mock`:
 from unittest.mock import patch
 from nbrun import runner
 
-with runner.load_notebook("notebook.ipynb") as nr:
+with runner.Notebook("notebook.ipynb") as nr:
     with patch("requests.get") as mock_get:
         mock_get.return_value.json.return_value = {"data": "mocked"}
         module = nr.execute()
@@ -70,25 +70,6 @@ with runner.load_notebook("notebook.ipynb") as nr:
 ```
 
 For file I/O, variable replacement is usually cleaner—replace the file contents or path directly rather than mocking `open()`.
-
-## 5) Use as a context manager or decorator (convenient in tests)
-
-```python
-from nbrun import runner
-
-
-with runner.load_notebook("notebook.ipynb") as nr:
-    nr.execute()
-```
-
-```python
-from nbrun import runner
-
-@runner.load_notebook("notebook.ipynb")
-def test_notebook(nr):
-    nr.execute()
-```
-
 
 # Why use nbrun?
 
