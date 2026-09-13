@@ -1,3 +1,4 @@
+from unittest import mock
 from nbrun import runner
 
 from .conftest import TEST_DATA_PATH
@@ -29,3 +30,32 @@ def test_run_notebook_context_manager() -> None:
 
     assert not nb_runner.py_path.exists()
     assert not nb_runner.modified_py_path.exists()
+
+
+def test_local_import() -> None:
+    """
+    We must be able to run a notebook that imports a Python module from the same directory.
+    We must also be able to mock out that function with unittest.mock.patch.
+    """
+    with runner.Notebook(
+        path=str(TEST_DATA_PATH / "notebook_local_import.ipynb")
+    ) as nb_runner:
+        result = nb_runner.execute()
+    assert result.result == 0
+    assert result.result2 == 1
+
+    # We must be able to use unittest.mock.patch to override functions
+    # imported from modules external to the notebook.
+
+    with runner.Notebook(
+        path=str(TEST_DATA_PATH / "notebook_local_import.ipynb")
+    ) as nb_runner:
+        with mock.patch("utils.calc") as mock_calc:
+            with mock.patch("child_folder.utils.calc") as mock_child_calc:
+                mock_calc.return_value = 10
+                mock_child_calc.return_value = 12
+                result = nb_runner.execute()
+    assert mock_calc.call_count == 1
+    assert mock_child_calc.call_count == 1
+    assert result.result == 10
+    assert result.result2 == 12

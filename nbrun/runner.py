@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import warnings
 from nbconvert import PythonExporter
 from pathlib import Path
@@ -85,7 +86,18 @@ class Notebook:
     def execute(self) -> ModuleType:
         if self._module is None or self._execute_module is None:
             raise ValueError("Call load_module first")
-        self._execute_module(self._module)
+
+        # Add the notebook directory to sys.path so that local
+        # imports work as expected.
+        # This modifies imports globally, so we take a copy of the list
+        # and restore it after we finish executing.
+        notebook_dir = str(self._path.resolve().parent)
+        original_sys_path = sys.path.copy()
+        sys.path.insert(0, notebook_dir)
+        try:
+            self._execute_module(self._module)
+        finally:
+            sys.path[:] = original_sys_path
         return self._module
 
     def cleanup(self) -> None:
