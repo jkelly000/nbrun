@@ -1,6 +1,8 @@
 import importlib.util
+import json
 import sys
 import warnings
+from collections.abc import Iterable
 from nbconvert import PythonExporter
 from pathlib import Path
 from hashlib import sha256
@@ -13,11 +15,59 @@ from .var_replacer import replace_vars
 from tempfile import TemporaryDirectory
 
 
+def detect_ipython_features(path: str | Path) -> set[str]:
+    """Return IPython-only syntax used by code cells in a notebook.
+
+    The returned feature names are ``"cell_magic"``, ``"line_magic"``,
+    ``"shell_escape"``, and ``"help_syntax"``.  This inspects the original
+    notebook source because nbconvert may rewrite these constructs before they
+    can be identified reliably.
+    """
+    notebook_path = path if isinstance(path, Path) else Path(path)
+    with notebook_path.open(encoding="utf-8") as notebook_file:
+        notebook = json.load(notebook_file)
+
+    features: set[str] = set()
+    for cell in notebook.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = _cell_source(cell.get("source", ""))
+        nonempty_lines = [line.strip() for line in source if line.strip()]
+        if nonempty_lines and nonempty_lines[0].startswith("%%"):
+            features.add("cell_magic")
+
+        for line in source:
+            stripped = line.strip()
+            if stripped.startswith("%%"):
+                features.add("cell_magic")
+            elif stripped.startswith("%"):
+                features.add("line_magic")
+            elif stripped.startswith("!"):
+                features.add("shell_escape")
+            elif (
+                stripped.startswith("?")
+                or stripped.startswith("??")
+                or stripped.endswith("?")
+                or stripped.endswith("??")
+            ):
+                features.add("help_syntax")
+    return features
+
+
+def _cell_source(source: str | Iterable[str]) -> list[str]:
+    if isinstance(source, str):
+        return source.splitlines()
+    return list(source)
+
+
 class Notebook:
     def __init__(
         self, path: str | Path, vars_to_replace: dict[str, Any] | None = None
     ) -> None:
         self._path = path if isinstance(path, Path) else Path(path)
+        ipython_features = detect_ipython_features(self._path)
+        if ipython_features:
+            raise NotImplementedError(f"Notebook at {self._path} does not support iPython features. Detected: {ipython_features}.")
         self._vars_to_replace = vars_to_replace or {}
         self._temp_dir = TemporaryDirectory()
         self.py_path = self._ipynb_to_py()

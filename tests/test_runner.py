@@ -4,6 +4,21 @@ from nbrun import runner
 from .conftest import TEST_DATA_PATH
 
 
+def test_detect_ipython_features() -> None:
+    assert runner.detect_ipython_features(
+        TEST_DATA_PATH / "notebook_ipython_features.ipynb"
+    ) == {
+        "cell_magic",
+        "line_magic",
+        "shell_escape",
+        "help_syntax",
+    }
+
+
+def test_detect_ipython_features_ignores_non_code_cells() -> None:
+    assert runner.detect_ipython_features(TEST_DATA_PATH / "notebook.ipynb") == set()
+
+
 def test_ipynb_to_py() -> None:
 
     nb_runner = runner.Notebook(path=TEST_DATA_PATH / "notebook.ipynb")
