@@ -34,6 +34,7 @@ nbconvert = "^7.17.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^9.0.1"
+pytest-codeblock = "^0.5.10"
 pytest-socket = "^0.8.0"
 
 [tool.poetry.group.lint.dependencies]

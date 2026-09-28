@@ -22,35 +22,38 @@ All of these are valid approaches, but nbrun:
 
 ## How to use
 
-```python
+<!-- pytestmark: pytestrun -->
+```python name=test_context
 from nbrun import runner
 
 def test_notebook() -> None:
     # context manager converts the notebook file to Python source code
-    with runner.Notebook("notebook.ipynb") as nr:
+    with runner.Notebook("tests/test_data/notebook.ipynb") as nr:
         # This line executes the source code,
         # with the return value of 'execute' holding all variables
         # from the notebook.
         result = nr.execute()
 
-    assert result.result == 5
+    assert result.result == 3
 ```
 
 ## Mocking external dependencies with unittest.mock
 
 For external API calls and side effects, you can combine nbrun with `unittest.mock.patch`:
 
-```python
+<!-- pytestmark: pytestrun -->
+```python name=test_requests_mock
 from unittest.mock import patch
 from nbrun import runner
 
 def test_notebook() -> None:
-    with runner.Notebook("notebook.ipynb") as nr:
+    with runner.Notebook("tests/test_data/notebook_requests.ipynb") as nr:
         with patch("requests.get") as mock_get:
-            mock_get.return_value.json.return_value = {"data": "mocked"}
-            module = nr.execute()
-            # Verify the API was called
+            mock_get.return_value.text = "foobar"
+            result = nr.execute()
+            # Verify the mocked function was called.
             assert mock_get.called
+            assert result.text == "foobar" 
 ```
 
 For file I/O, variable replacement is usually cleaner—replace the file contents or path directly rather than mocking `open()`.
@@ -60,7 +63,7 @@ For file I/O, variable replacement is usually cleaner—replace the file content
 Python notebooks will often contain variables at the top level of the notebook which take a global scope.
 
 ```python
-GLOBAL_VAR = 500
+INPUT_STR = "FOO"
 ```
 This can't be patched with unittest, even after we've converted the Python notebook to Python source code.
 Rather than creating multiple copies a notebook, nbrun allows you to replace variable values in the actual source code
@@ -70,13 +73,14 @@ This should be used with caution.
 To replace variable values, pass in a dictionary where the keys are the variable names (case-sensitive)
 and the values are the values to be used.
 
-```python
+<!-- pytestmark: pytestrun -->
+```python name=test_replace_global_var
 from nbrun import runner
 
 def test_notebook():
-    with runner.Notebook("notebook.ipynb", vars_to_replace={"GLOBAL_VAR": 123}) as nr:
+    with runner.Notebook("tests/test_data/notebook.ipynb", vars_to_replace={"INPUT_STR": "FOOBAR"}) as nr:
         result = nr.execute()
-        assert result.GLOBAL_VAR == 123
+        assert result.INPUT_STR == "FOOBAR"
 ```
 
 `vars_to_replace` can also be used to replace function calls, but assigning a new value
@@ -85,20 +89,32 @@ to the variable which the function's return value is assigned to.
 If we have in a notebook:
 ```python
 
-def expensive_computation():
-    return 999
+def calc(a: int, b: int) -> int:
+    return sum((a, b))
 
-result = expensive_computation()
+result = calc(a, b)
 ```
+In a real scenario, this might take a long time to run, or cost money.
 
-We can avoid calling the `expensive_computation` function by setting `vars_to_replace` as:
-```python
+We can avoid calling the `calc` function by setting `vars_to_replace` as:
 
-def test_notebook() -> None:
-    with runner.Notebook("notebook.ipynb", vars_to_replace={"result": 5}) as nr:
+<!-- pytestmark: pytestrun -->
+```python name=test_var_replacement_avoid_function
+from nbrun import runner
+
+def test_notebook() -> None:    
+    NB_PATH = "tests/test_data/notebook.ipynb"
+    
+    # Without the variable replacement, the 'calc' function gets called.
+    with runner.Notebook(NB_PATH) as nr:
+        result = nr.execute()
+        assert result.result == 3
+    
+    # With the variable replacement, result is declared as an integer and the calc function
+    # is never called.
+    with runner.Notebook(NB_PATH, vars_to_replace={"result": 5}) as nr:
         result = nr.execute()
         assert result.result == 5
-
 ```
 
 
