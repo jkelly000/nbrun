@@ -119,24 +119,30 @@ def test_notebook() -> None:
 
 
 We can also replace variables that are defined within in-notebook function bodies:
-```python
-def computation():
-    var_x = 6
-    return var_x
 
-result = computation()
+
+```python
+def computation(n: int):
+    var_x = 6
+    return var_x * n
+
+result = computation(6)
 ```
 We can just replace the value of `var_x` within the function body
 and call the modified definition of the `computation` function:
 
-```python
+<!-- pytestmark: pytestrun -->
+```python name=test_replace_var_in_function
+from nbrun import runner
 
 def test_notebook() -> None:
-    with runner.Notebook("notebook.ipynb", vars_to_replace={"computation:var_x": 1}) as nr:
+    with runner.Notebook(
+        "tests/test_data/notebook_var_in_function.ipynb", vars_to_replace={"computation:var_x": 1}
+    ) as nr:
         result = nr.execute()
-        assert result.result == 1
-
+        assert result.result == 6
 ```
+Nbrun handles the changes to PATH required for this code to run as is.
 
 ## Supports notebooks which import .py files
 Although an aim of nbrun is to avoid developers moving code to separate .py files solely for testability,
@@ -146,13 +152,16 @@ nbrun supports this out of the box.
 
 For example, in a notebook:
 ```python
-result = computation()
+import utils
+
+result = utils.calc(4, 6)
+display(result)
 ```
 
 In a separate .py file in the same directory / subdirectory:
 ```python
-def computation():
-    return 6
+def calc(foo: int, bar: int) -> int:
+    return foo // bar
 ```
 
 # Limitations
