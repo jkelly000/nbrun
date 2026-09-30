@@ -65,6 +65,10 @@ class Notebook:
         self, path: str | Path, vars_to_replace: dict[str, Any] | None = None
     ) -> None:
         self._path = path if isinstance(path, Path) else Path(path)
+        if not self._path.exists():
+            raise ValueError(f"No file found at {self._path}.")
+        if not self._path.suffix == ".ipynb":
+            raise ValueError(f"Expecting file to have .ipynb suffix. Got {self._path.suffix}.")
         ipython_features = detect_ipython_features(self._path)
         if ipython_features:
             raise NotImplementedError(f"Notebook at {self._path} does not support iPython features. Detected: {ipython_features}.")
