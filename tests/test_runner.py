@@ -1,13 +1,25 @@
 from unittest import mock
 from nbrun import runner
+import pytest
 
 from .conftest import TEST_DATA_PATH
 
 
-def test_detect_ipython_features() -> None:
-    assert runner.detect_ipython_features(
-        TEST_DATA_PATH / "notebook_ipython_features.ipynb"
-    ) == {
+@pytest.mark.parametrize(
+    "nb_filename",
+    [
+        "notebook_ipython_features.ipynb",
+        "notebook_ipython_features_str_code_cell.ipynb",
+    ],
+)
+def test_detect_ipython_features(nb_filename: str) -> None:
+    """
+    nbrun must be able to detect typical ipython features, so that it can raise an Exception.
+    We must be able to handle code cells formatted in the 2 allowed ways:
+    1) where the 'code' is a list of strings
+    2) where the 'code' is a single string containing lines separated by newline characters.
+    """
+    assert runner.detect_ipython_features(TEST_DATA_PATH / nb_filename) == {
         "cell_magic",
         "line_magic",
         "shell_escape",
@@ -16,11 +28,14 @@ def test_detect_ipython_features() -> None:
 
 
 def test_detect_ipython_features_ignores_non_code_cells() -> None:
+    """
+    For a notebook with no ipython features, we must detect none.
+    """
     assert runner.detect_ipython_features(TEST_DATA_PATH / "notebook.ipynb") == set()
 
 
 def test_ipynb_to_py() -> None:
-
+    
     nb_runner = runner.Notebook(path=TEST_DATA_PATH / "notebook.ipynb")
     assert nb_runner.py_path.exists()
     assert nb_runner.py_path.is_file()

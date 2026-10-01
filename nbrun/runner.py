@@ -15,6 +15,21 @@ from .var_replacer import replace_vars
 from tempfile import TemporaryDirectory
 
 
+def find_ipython_feature(line: str) -> str | None:
+    """
+    Search for ipython features in a line of Python.
+    """
+    if line.startswith("%%"):
+        return "cell_magic"
+    if line.startswith("%"):
+        return "line_magic"
+    if line.startswith("!"):
+        return "shell_escape"
+    if line.startswith("?") or line.endswith("?"):
+        return "help_syntax"
+    return None
+
+
 def detect_ipython_features(path: str | Path) -> set[str]:
     """Return IPython-only syntax used by code cells in a notebook.
 
@@ -32,25 +47,10 @@ def detect_ipython_features(path: str | Path) -> set[str]:
         if cell.get("cell_type") != "code":
             continue
         source = _cell_source(cell.get("source", ""))
-        nonempty_lines = [line.strip() for line in source if line.strip()]
-        if nonempty_lines and nonempty_lines[0].startswith("%%"):
-            features.add("cell_magic")
-
         for line in source:
-            stripped = line.strip()
-            if stripped.startswith("%%"):
-                features.add("cell_magic")
-            elif stripped.startswith("%"):
-                features.add("line_magic")
-            elif stripped.startswith("!"):
-                features.add("shell_escape")
-            elif (
-                stripped.startswith("?")
-                or stripped.startswith("??")
-                or stripped.endswith("?")
-                or stripped.endswith("??")
-            ):
-                features.add("help_syntax")
+            feature = find_ipython_feature(line.strip())
+            if feature is not None:
+                features.add(feature)
     return features
 
 
@@ -68,10 +68,14 @@ class Notebook:
         if not self._path.exists():
             raise ValueError(f"No file found at {self._path}.")
         if not self._path.suffix == ".ipynb":
-            raise ValueError(f"Expecting file to have .ipynb suffix. Got {self._path.suffix}.")
+            raise ValueError(
+                f"Expecting file to have .ipynb suffix. Got {self._path.suffix}."
+            )
         ipython_features = detect_ipython_features(self._path)
         if ipython_features:
-            raise NotImplementedError(f"Notebook at {self._path} does not support iPython features. Detected: {ipython_features}.")
+            raise NotImplementedError(
+                f"Notebook at {self._path} does not support iPython features. Detected: {ipython_features}."
+            )
         self._vars_to_replace = vars_to_replace or {}
         self._temp_dir = TemporaryDirectory()
         self.py_path = self._ipynb_to_py()

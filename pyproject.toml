@@ -41,6 +41,11 @@ pytest-socket = "^0.8.0"
 mypy = "^1.11.0"
 ruff = "^0.15.16"
 
+[tool.ruff]
+# It's probably overkill to format/lint the test notebook files.
+# It also actually reformats tests/test_data/notebook_ipython_features_str_code_cell.ipynb which
+# breaks a test case.
+extend-exclude = ["*.ipynb"]
 
 [project.urls]
 Repository = "https://github.com/jkelly000/nbrun"
