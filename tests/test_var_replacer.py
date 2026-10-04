@@ -58,6 +58,7 @@ from typing import Any
     ],
 )
 def test_replace_vars(source: str, vars_to_replace: dict[str, Any], output: str):
+    """Configured variables should be rewritten in-place while preserving code structure."""
     assert replace_vars(source, vars_to_replace) == output
 
 

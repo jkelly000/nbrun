@@ -1,3 +1,5 @@
+"""Convert notebooks to Python modules and execute them without a Jupyter kernel."""
+
 import importlib.util
 import json
 import sys
@@ -16,9 +18,7 @@ from tempfile import TemporaryDirectory
 
 
 def find_ipython_feature(line: str) -> str | None:
-    """
-    Search for ipython features in a line of Python.
-    """
+    """Return the IPython-only feature used on a source line, if any."""
     if line.startswith("%%"):
         return "cell_magic"
     if line.startswith("%"):
@@ -55,15 +55,35 @@ def detect_ipython_features(path: str | Path) -> set[str]:
 
 
 def _cell_source(source: str | Iterable[str]) -> list[str]:
+    """Normalize a notebook cell's source representation into lines."""
     if isinstance(source, str):
         return source.splitlines()
     return list(source)
 
 
 class Notebook:
+    """Prepare and execute a notebook as a Python module.
+
+    IPython-specific syntax is rejected, and optional variable replacements are
+    applied to the exported source before it is loaded. Use this class as a
+    context manager or call :meth:`cleanup` to remove its temporary files.
+    """
+
     def __init__(
         self, path: str | Path, vars_to_replace: dict[str, Any] | None = None
     ) -> None:
+        """Validate a notebook path, export it, apply replacements, and load it.
+
+        Args:
+            path: Path to an ``.ipynb`` notebook.
+            vars_to_replace: Optional mapping of variable names or scoped paths
+                to constant values used in place of their assignments.
+
+        Raises:
+            ValueError: If the path does not exist or is not an ``.ipynb`` file.
+            NotImplementedError: If a code cell contains unsupported
+                IPython-specific syntax.
+        """
         self._path = path if isinstance(path, Path) else Path(path)
         if not self._path.exists():
             raise ValueError(f"No file found at {self._path}.")
@@ -85,10 +105,7 @@ class Notebook:
         self._load_module()
 
     def _ipynb_to_py(self) -> Path:
-        """
-        Given a path of a Jupyter Notebook, export it as a Python file
-        to the specified path, without any modification.
-        """
+        """Export the notebook to an unmodified Python file in the temp directory."""
         python_exporter = PythonExporter()
 
         out_path = Path(self._temp_dir.name) / self._path.with_suffix(".py").name
@@ -105,6 +122,7 @@ class Notebook:
         return out_path
 
     def _modify_vars(self) -> Path:
+        """Write and return the exported Python file with variable replacements applied."""
         with open(str(self.py_path), "r") as fh:
             modified_source = replace_vars(fh.read(), self._vars_to_replace)
         out_path = Path(self._temp_dir.name) / self.py_path.with_stem(
@@ -115,6 +133,7 @@ class Notebook:
         return out_path
 
     def _load_module(self) -> None:
+        """Create the notebook module and prepare its loader for later execution."""
         # Defensive runtime check: modified_py_path should always be set by modify_vars.
         # If this check ever triggers it's a bug in the construction flow, so raise a
         # clear error. This is not expected during normal operation.
@@ -142,6 +161,11 @@ class Notebook:
         return None
 
     def execute(self) -> ModuleType:
+        """Execute the prepared notebook module and return it with its variables.
+
+        The notebook's containing directory is temporarily added to ``sys.path``
+        so imports of nearby Python files work during execution.
+        """
         if self._module is None or self._execute_module is None:
             raise ValueError("Call load_module first")
 
@@ -159,12 +183,14 @@ class Notebook:
         return self._module
 
     def cleanup(self) -> None:
+        """Remove the temporary exported and modified Python files."""
         self._temp_dir.cleanup()
 
     def __enter__(self):
+        """Return this notebook runner for use in a ``with`` statement."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup on exit."""
+        """Clean up temporary files when leaving a ``with`` statement."""
         self.cleanup()
         return False

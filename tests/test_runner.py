@@ -35,7 +35,7 @@ def test_detect_ipython_features_ignores_non_code_cells() -> None:
 
 
 def test_ipynb_to_py() -> None:
-    
+    """The notebook should produce a generated Python file and preserve it until cleanup."""
     nb_runner = runner.Notebook(path=TEST_DATA_PATH / "notebook.ipynb")
     assert nb_runner.py_path.exists()
     assert nb_runner.py_path.is_file()
@@ -43,6 +43,7 @@ def test_ipynb_to_py() -> None:
 
 
 def test_execute_module() -> None:
+    """Executing a notebook should return its computed outputs and clean up temporary files."""
     nb_runner = runner.Notebook(path=TEST_DATA_PATH / "notebook.ipynb")
 
     result = nb_runner.execute()
@@ -55,6 +56,7 @@ def test_execute_module() -> None:
 
 
 def test_run_notebook_context_manager() -> None:
+    """The notebook context manager should remove generated files when the block exits."""
     with runner.Notebook(path=str(TEST_DATA_PATH / "notebook.ipynb")) as nb_runner:
         nb_runner.execute()
 
