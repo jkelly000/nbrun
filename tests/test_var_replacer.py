@@ -11,12 +11,6 @@ from typing import Any
             "x: int = 5", {"x": 100}, "x: int = 100", id="annotated_global_var"
         ),
         pytest.param(
-            "x = y = z = 5",
-            {"x": 10, "y": 20, "z": 30},
-            "x = y = z = 30",
-            id="chained_assignment",
-        ),
-        pytest.param(
             "def foo():\n    x = 5",
             {"foo:x": 100},
             "def foo():\n    x = 100",
@@ -75,3 +69,21 @@ def test_reject_callables():
 
     with pytest.raises(ValueError, match="is a callable"):
         replace_vars("x = 5", {"x": len})
+
+
+def test_reject_unmatched_target():
+    """Replacement targets without a matching assignment must be rejected."""
+    with pytest.raises(ValueError, match="No assignment found for replacement target"):
+        replace_vars("x = 5", {"y": 100})
+
+
+def test_reject_target_with_multiple_matches():
+    """Replacement targets with multiple matching assignments must be rejected."""
+    with pytest.raises(ValueError, match="already replaced"):
+        replace_vars("x = 5\nx = 10", {"x": 100})
+
+
+def test_reject_chained_assignment():
+    """Targets that match a variable in a chained assignment must be rejected."""
+    with pytest.raises(ValueError, match="chained assignment"):
+        replace_vars("x = y = 10", {"x": 100})

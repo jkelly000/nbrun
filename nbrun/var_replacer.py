@@ -12,6 +12,7 @@ class VarReplacer(ast.NodeTransformer):
     def __init__(self, vars_to_replace: dict[str, Any]):
         """Initialize the transformer and validate all requested replacement values."""
         self.vars_to_replace = vars_to_replace
+        self.vars_replaced: set[str] = set()
         self.scope_stack: list[str] = []  # Track current function/class scope
         # Validate all replacements upfront
         self._validate_replacements()
@@ -45,13 +46,25 @@ class VarReplacer(ast.NodeTransformer):
     def visit_Assign(self, node: ast.Assign) -> ast.Assign:
         """Replace the value of an assignment whose target matches a configured name."""
         # Check if any target matches our replacement dict
+        multiple_targets = len(node.targets) > 1
+
         for target in node.targets:
             if isinstance(target, ast.Name):
                 full_path = self._get_full_path(target.id)
                 if full_path in self.vars_to_replace:
+                    if multiple_targets:
+                        raise ValueError(
+                            f"{full_path} matched a chained assignment. Targets in chained assignments is not supported."
+                        )
                     # Replace the value with a constant
                     new_value = self.vars_to_replace[full_path]
                     node.value = ast.Constant(value=new_value)
+                    if full_path in self.vars_replaced:
+                        raise ValueError(
+                            f"{full_path} already replaced. Cannot reassign."
+                        )
+                    else:
+                        self.vars_replaced.add(full_path)
         return node
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.AnnAssign:
@@ -65,6 +78,10 @@ class VarReplacer(ast.NodeTransformer):
                 # Replace the value with a constant
                 new_value = self.vars_to_replace[full_path]
                 node.value = ast.Constant(value=new_value)
+                if full_path in self.vars_replaced:
+                    raise ValueError(f"{full_path} already replaced. Cannot reassign.")
+                else:
+                    self.vars_replaced.add(full_path)
         return node
 
     def _visit_scope(self, node: T, scope_name: str) -> T:
@@ -105,5 +122,11 @@ def replace_vars(source: str, vars_to_replace: dict[str, Any]) -> str:
     paths, such as ``"calculate:seed"``.
     """
     module = ast.parse(source)
-    VarReplacer(vars_to_replace=vars_to_replace).visit(module)
+    replacer = VarReplacer(vars_to_replace=vars_to_replace)
+    replacer.visit(module)
+    vars_unmatched = set(replacer.vars_to_replace.keys()) - replacer.vars_replaced
+    if vars_unmatched:
+        raise ValueError(
+            f"No assignment found for replacement targets: {sorted(vars_unmatched)}"
+        )
     return ast.unparse(module)
