@@ -3,10 +3,10 @@ nbrun — run notebooks programmatically
 
 # Purpose
 
-While much easier for non-technical users to run, Jupyter notebooks are not trivial to test.
+While much easier for non-technical users to run, Jupyter notebooks can be tricky to test.
 User requirements shift, external libraries change and, without tests, bugs can often surface.
 
-The aim of nbrun is help developers write unit tests which are easy to write and run.
+The aim of nbrun is help developers write unit tests for notebooks which are easy to write and run.
 
 # What makes nbrun different to other approaches to testing Jupyter notebooks?
 
@@ -19,6 +19,15 @@ All of these are valid approaches, but nbrun:
 * doesn't need a Jupyter kernel - it uses the active Python environment, allowing you to debug line by line within the notebook code
 * lets you test notebooks without significantly rewriting notebooks just to gain test coverage
 
+## Why use nbrun?
+
+`nbrun` is useful when notebooks contain real logic that needs to be validated under CI, regression-tested, or exercised with controlled inputs.
+
+It is particularly helpful when you want to:
+* keep the notebook close to the analysis workflow without turning it into a fragile manual process
+* test notebook outputs with the same tools you already use for Python code (`pytest`, `mock`, assertions)
+* avoid expensive or flaky side effects during testing by replacing values before execution
+* exercise logic in a normal Python environment, with easier debugging and faster iteration than kernel-driven test tooling
 
 ## How to use
 
@@ -72,16 +81,29 @@ This should be used with caution.
 
 To replace variable values, pass in a dictionary where the keys are the variable names (case-sensitive)
 and the values are the values to be used.
+If a target has multiple assignments in the same scope, `nbrun` raises a `ValueError` rather than
+replacing an ambiguous assignment.
 
 <!-- pytestmark: pytestrun -->
 ```python name=test_replace_global_var
+import pytest
 from nbrun import runner
 
-def test_notebook():
-    with runner.Notebook("tests/test_data/notebook.ipynb", vars_to_replace={"INPUT_STR": "FOOBAR"}) as nr:
+@pytest.mark.parametrize(
+    ("replacement_value", "expected"),
+    [("FOOBAR", "FOOBAR"), ("BARBAZ", "BARBAZ")],
+)
+def test_notebook_with_replacement(replacement_value: str, expected: str) -> None:
+    with runner.Notebook(
+        "tests/test_data/notebook.ipynb",
+        vars_to_replace={"INPUT_STR": replacement_value},
+    ) as nr:
         result = nr.execute()
-        assert result.INPUT_STR == "FOOBAR"
+
+    assert result.INPUT_STR == expected
 ```
+
+Parameterizing the replacement checks several controlled input values against the same notebook, without maintaining copies of the notebook.
 
 `vars_to_replace` can also be used to replace function calls, but assigning a new value
 to the variable which the function's return value is assigned to.
@@ -164,22 +186,18 @@ def calc(foo: int, bar: int) -> int:
     return foo // bar
 ```
 
-# Limitations
+# Limitations and caveats
 
-`nbrun` executes notebooks as ordinary Python modules rather than through a
-Jupyter kernel.
+`nbrun` executes notebooks as ordinary Python modules, not as a live Jupyter session. That is the core trade-off: the result is easier to test and debug in Python, but it is not a full notebook runtime.
 
 The following are not supported:
-* IPython-specific features, such as:
-  * line magics (`%time`)
-  * cell magics (`%%bash`)
-  * shell escapes (`!echo hello`)
-  * help syntax (`result?`)
-* executing notebook code cell by cell
-  * nbrun has no concept of 'cells' as all Python code in a notebook is glued together
+* IPython-specific syntax such as line magics (`%time`), cell magics (`%%bash`), shell escapes (`!echo hello`), and help syntax (`result?`)
+* cell-by-cell execution semantics; the notebook is treated as a single Python module
+* arbitrary dynamic rewrites of notebook state; replacements are deliberately limited to constant values
 
-Given how commonly used it is, calls to `display()` is mocked out, but this is currently the only
-notebook-specific feature that is not rejected.
+`display()` is mocked out, which is usually the right behavior in tests, but it means notebook-only display behavior is not executed.
+
+If your workflow depends on a rich interactive notebook environment, `nbrun` is not meant to replace that experience. It is intended for deterministic automation and testability.
 
 # Installation
 
