@@ -1,33 +1,28 @@
 nbrun — run notebooks programmatically
 ====================================
 
-# Purpose
-
 While much easier for non-technical users to run, Jupyter notebooks can be tricky to test.
 User requirements shift, external libraries change and, without tests, bugs can often surface.
 
-The aim of nbrun is help developers write unit tests for notebooks which are easy to write and run.
+nbrun helps developers write unit tests for notebooks which are easy to write and run.
 
-# What makes nbrun different to other approaches to testing Jupyter notebooks?
+# How is nbrun different?
 
 Most approaches to unit-testing Jupyter notebooks involve either:
 1) Writing unit tests within Jupyter notebooks themselves
 2) Writing unit tests outside of Jupyter notebooks and using a Jupyter kernel to run the notebooks (e.g. [Testbook](https://pypi.org/project/testbook/))
 3) Writing notebooks where the heavy lifting happens in .py files which get imported - the unit tests then cover these .py files.
 
-All of these are valid approaches, but nbrun:
-* doesn't need a Jupyter kernel - it uses the active Python environment, allowing you to debug line by line within the notebook code
-* lets you test notebooks without significantly rewriting notebooks just to gain test coverage
+## No Jupyter Kernel
+nbrun doesn't use a Jupyter kernel - tests run in the active Python environment, meaning you can debug the exported notebook code line by line.
 
-## Why use nbrun?
+This also lets you make assertions on the final state of variables from the notebook, in addition to any files that may have been written.
 
-`nbrun` is useful when notebooks contain real logic that needs to be validated under CI, regression-tested, or exercised with controlled inputs.
+## Variable replacement
+Python notebooks are often structured with constants at the top of the file which are passed into functions or API calls further down the notebook. These can't be neatly overwritten for testing using patching.
 
-It is particularly helpful when you want to:
-* keep the notebook close to the analysis workflow without turning it into a fragile manual process
-* test notebook outputs with the same tools you already use for Python code (`pytest`, `mock`, assertions)
-* avoid expensive or flaky side effects during testing by replacing values before execution
-* exercise logic in a normal Python environment, with easier debugging and faster iteration than kernel-driven test tooling
+Instead of creating multiple copies of a notebook to do testing, having to keep them in sync, nbrun lets you test a notebook from a unit test, modifying the source code before it gets executed.
+
 
 ## How to use
 
@@ -65,18 +60,16 @@ def test_notebook() -> None:
             assert result.text == "foobar" 
 ```
 
-For file I/O, variable replacement is usually cleaner—replace the file contents or path directly rather than mocking `open()`.
+## Overriding values before execution
 
-## Overriding values that unittest.mock can't reach.
-
-Python notebooks will often contain variables at the top level of the notebook which take a global scope.
+Python notebooks often contain variables at the top level, which have module-global scope.
 
 ```python
 INPUT_STR = "FOO"
 ```
-This can't be patched with unittest, even after we've converted the Python notebook to Python source code.
-Rather than creating multiple copies a notebook, nbrun allows you to replace variable values in the actual source code
-before it gets executed.
+`unittest.mock.patch` can replace module globals, but a notebook's top-level code runs when the module is executed. Patching a value after that execution is too late to affect code that has already run, and a top-level assignment would overwrite a patch made beforehand.
+
+Rather than creating multiple copies of a notebook, nbrun lets you replace variable values in the source code before it gets executed.
 This should be used with caution.
 
 To replace variable values, pass in a dictionary where the keys are the variable names (case-sensitive)
@@ -105,8 +98,7 @@ def test_notebook_with_replacement(replacement_value: str, expected: str) -> Non
 
 Parameterizing the replacement checks several controlled input values against the same notebook, without maintaining copies of the notebook.
 
-`vars_to_replace` can also be used to replace function calls, but assigning a new value
-to the variable which the function's return value is assigned to.
+`vars_to_replace` can also skip a function call by replacing the variable that would receive its return value. It replaces the assignment, not the function itself.
 
 If we have in a notebook:
 ```python
@@ -118,7 +110,7 @@ result = calc(a, b)
 ```
 In a real scenario, this might take a long time to run, or cost money.
 
-We can avoid calling the `calc` function by setting `vars_to_replace` as:
+We can avoid calling the `calc` function by replacing `result`:
 
 <!-- pytestmark: pytestrun -->
 ```python name=test_var_replacement_avoid_function
@@ -140,7 +132,7 @@ def test_notebook() -> None:
 ```
 
 
-We can also replace variables that are defined within in-notebook function bodies:
+We can also replace variables defined within notebook function bodies:
 
 
 ```python
@@ -164,7 +156,7 @@ def test_notebook() -> None:
         result = nr.execute()
         assert result.result == 6
 ```
-Nbrun handles the changes to PATH required for this code to run as is.
+nbrun handles the changes to `sys.path` required for this code to run as is.
 
 ## Supports notebooks which import .py files
 Although an aim of nbrun is to avoid developers moving code to separate .py files solely for testability,
